@@ -1,0 +1,458 @@
+{
+    "agent_id": "6f17ad77-ec4b-5378-88a4-f03da8f6066c",
+    "model": "gpt-4o",
+    "name": "reusable agent-2",
+    "system_prompt": "Keep it crisp and dense",
+    "skills_config": [
+        {
+            "llm_schema": {
+                "title": "LLMSchema",
+                "type": "object",
+                "properties": {
+                    "user_query": {
+                        "title": "User Query",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "user_query"
+                ]
+            },
+            "name": "semester-goal-setting",
+            "input_schema": {
+                "title": "SkillRequest",
+                "type": "object",
+                "properties": {
+                    "user_query": {
+                        "title": "User Query",
+                        "type": "string"
+                    },
+                    "role": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Your role in achieving the goal",
+                        "default": null,
+                        "examples": [
+                            "Lead"
+                        ],
+                        "title": "Role"
+                    },
+                    "agent_id": {
+                        "title": "Agent Id",
+                        "type": "string"
+                    },
+                    "max_tokens": {
+                        "title": "Max Tokens",
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": 1500
+                    },
+                    "bearer_auth": {
+                        "title": "Bearer Auth",
+                        "type": "string"
+                    },
+                    "system_prompt": {
+                        "title": "System Prompt",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": "You are a dedicated and professional employee writing your semester goal."
+                    },
+                    "min_response_token": {
+                        "title": "Min Response Token",
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": 500
+                    },
+                    "client_id": {
+                        "title": "Client Id",
+                        "type": "string"
+                    },
+                    "thread_id": {
+                        "title": "Thread Id",
+                        "type": "string"
+                    },
+                    "metric": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "How success will be measured (LLM will create one if not provided)",
+                        "default": null,
+                        "examples": [
+                            "Reduce onboarding time from 10 to 5 days"
+                        ],
+                        "title": "Metric"
+                    },
+                    "r_parent_wf_text_req_id": {
+                        "title": "R Parent Wf Text Req Id",
+                        "type": "string"
+                    },
+                    "temperature": {
+                        "title": "Temperature",
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": 0
+                    },
+                    "correlation_id": {
+                        "title": "Correlation Id",
+                        "type": "string"
+                    },
+                    "model": {
+                        "title": "Model",
+                        "type": "string"
+                    },
+                    "goal_idea": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Brief description of the goal or initiative",
+                        "default": null,
+                        "examples": [
+                            "Improve onboarding by optimizing documentation"
+                        ],
+                        "title": "Goal Idea"
+                    },
+                    "max_input_tokens": {
+                        "title": "Max Input Tokens",
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null
+                    }
+                },
+                "required": [
+                    "user_query",
+                    "thread_id",
+                    "client_id",
+                    "agent_id",
+                    "model",
+                    "bearer_auth",
+                    "r_parent_wf_text_req_id",
+                    "correlation_id"
+                ]
+            },
+            "description": "semester-goal-setting",
+            "skill_id": "f5cd3786-d454-58a5-b271-79df1d2483bd",
+        },
+        {
+            "llm_schema": {
+                "title": "LLMSchema",
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "title": "Query",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            },
+            "name": "consensus-search",
+            "input_schema": {
+                "$defs": {
+                    "ConsensusSearchParams": {
+                        "title": "ConsensusSearchParams",
+                        "type": "object",
+                        "properties": {
+                            "sjr_max": {
+                                "title": "Sjr Max",
+                                "anyOf": [
+                                    {
+                                        "type": "integer",
+                                        "maximum": 4,
+                                        "minimum": 1
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": null
+                            },
+                            "query": {
+                                "title": "Query",
+                                "type": "string"
+                            },
+                            "study_types": {
+                                "title": "Study Types",
+                                "anyOf": [
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "year_min": {
+                                "title": "Year Min",
+                                "anyOf": [
+                                    {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": null
+                            },
+                            "human": {
+                                "title": "Human",
+                                "anyOf": [
+                                    {
+                                        "type": "boolean"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": null
+                            },
+                            "include_semantic_score": {
+                                "title": "Include Semantic Score",
+                                "anyOf": [
+                                    {
+                                        "type": "boolean"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": true
+                            },
+                            "year_max": {
+                                "title": "Year Max",
+                                "anyOf": [
+                                    {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": null
+                            },
+                            "sample_size_min": {
+                                "title": "Sample Size Min",
+                                "anyOf": [
+                                    {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "default": null
+                            }
+                        },
+                        "required": [
+                            "query",
+                            "study_types"
+                        ]
+                    }
+                },
+                "title": "SkillRequest",
+                "type": "object",
+                "properties": {
+                    "correlation_id": {
+                        "title": "Correlation Id",
+                        "type": "string"
+                    },
+                    "thread_id": {
+                        "title": "Thread Id",
+                        "type": "string"
+                    },
+                    "agent_id": {
+                        "title": "Agent Id",
+                        "type": "string"
+                    },
+                    "client_id": {
+                        "title": "Client Id",
+                        "type": "string"
+                    },
+                    "query_params": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/$defs/ConsensusSearchParams"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "client_id",
+                    "thread_id",
+                    "agent_id",
+                    "correlation_id",
+                    "query_params"
+                ]
+            },
+            "description": "consensus is an academic search engine, powered by ai, but grounded in scientific research. purpose-built search technology to surface the most relevant papers. it synthesizes both topic-level and paper-level insights. everything is connected to real research papers",
+            "skill_id": "897d0d3c-9cc1-5a27-b259-0efceb53c0b9",
+        },
+        {
+            "name": "file-type-check",
+            "input_schema": {
+                "title": "SkillRequest",
+                "type": "object",
+                "properties": {
+                    "x_vsl_client_id": {
+                        "title": "X Vsl Client Id",
+                        "type": "string",
+                        "default": null
+                    },
+                    "thread_id": {
+                        "title": "Thread Id",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "anyOf": [
+                            {
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null
+                    },
+                    "user_query": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "User's query; optional unless required by the skill",
+                        "default": null,
+                        "title": "User Query"
+                    },
+                    "agent_id": {
+                        "title": "Agent Id",
+                        "type": "string"
+                    },
+                    "metadata_filter_values_condition": {
+                        "title": "Metadata Filter Values Condition",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": "or"
+                    },
+                    "bearer_auth": {
+                        "title": "Bearer Auth",
+                        "type": "string"
+                    },
+                    "correlation_id": {
+                        "title": "Correlation Id",
+                        "type": "string"
+                    },
+                    "metadata_filter_condition": {
+                        "title": "Metadata Filter Condition",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": "or"
+                    },
+                    "index_md5_mapping": {
+                        "title": "Index Md5 Mapping",
+                        "anyOf": [
+                            {
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null
+                    },
+                    "client_id": {
+                        "title": "Client Id",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "thread_id",
+                    "client_id",
+                    "bearer_auth",
+                    "correlation_id",
+                    "agent_id"
+                ]
+            },
+            "description": "this skill is meant to be used as a conditional edge to check the document type are tabular or non-tabular.",
+            "skill_id": "db10cd6b-b4a9-5edd-8937-2bda61b68ba6",
+        }
+    ]
+}
