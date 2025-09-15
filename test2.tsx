@@ -284,6 +284,7 @@ const AgentFormInputModal = ({
   }, []);
 
   const isSubmitDisabled = useMemo(() => {
+    // Check for empty static required fields
     const allRequiredFields = combinedRequired.filter(
       (field) => !browserFields.includes(field)
     );
@@ -291,32 +292,40 @@ const AgentFormInputModal = ({
     const hasEmptyStaticRequired = allRequiredFields.some((field) => {
       const value = formData[field];
       const fieldData = combinedProperties[field];
-      if (
-        fieldData?.default === null ||
-        fieldData?.anyOf?.[0]?.type === null
-      ) {
+
+      // If the field has a default of null or its type is null, it should be considered optional, so return false.
+      if (fieldData?.default === null || fieldData?.anyOf?.[0]?.type === 'null') {
         return false;
       }
+
       return (
         value === undefined ||
         value === "" ||
-        (Array.isArray(value) && value.length === 0)
+        (Array.isArray(value) && value.length === 0) ||
+        // Explicitly check for null.
+        value === null
       );
     });
 
     if (hasEmptyStaticRequired) return true;
 
+    // Check for empty dynamic required fields
     const hasEmptyDynamicRequired = Object.entries(dynamicFieldsData).some(
       ([key, schema]) => {
-        if (!schema?.required) return false;
-        if (browserFields.includes(key)) return false;
-        if (schema?.default === null || schema?.anyOf?.[0]?.type === null) return false;
+        // Only check required fields that aren't in the browserFields list.
+        if (!schema?.required || browserFields.includes(key)) {
+          return false;
+        }
+
+        // If the schema has a default of null or its type is null, it's not truly required.
+        if (schema?.default === null || schema?.anyOf?.[0]?.type === 'null') {
+          return false;
+        }
 
         const value = formData?.[key] ?? formData?.query_params?.[key] ?? undefined;
         if (Array.isArray(value)) return value.length === 0;
-        if (typeof value === "object" && value !== null)
-          return Object.keys(value).length === 0;
-        return value === undefined || value === "";
+        if (typeof value === "object" && value !== null) return Object.keys(value).length === 0;
+        return value === undefined || value === "" || value === null;
       }
     );
 
@@ -335,26 +344,58 @@ const AgentFormInputModal = ({
         <h5 className="error-message-container">{failedCondition}</h5>
       );
     }
+
     return localAgentDetail.skills_config && localAgentDetail.skills_config.map((skill: any, skillIndex: number) => {
       const skillName = skill.name || `Skill ${skillIndex + 1}`;
       const skillProperties = Object.entries(skill.input_schema?.properties || {});
       const skillRequired = skill.input_schema?.required || [];
+      // Filter properties to exclude browser-specific fields and special cases like query_params
+      const filteredProperties = skillProperties.filter(([key]) => {
+        return !browserFields.includes(key) && key !== "query_params";
+      });
+      // Extract and render dynamic fields for this specific skill
+      const dynamicRefs = skillProperties.filter(([, value]: any) => value?.$ref || value?.anyOf?.[0]?.$ref);
+      const skillDynamicFields: { [key: string]: any } = {};
 
-      const requiredFields = skillProperties.filter(
-        ([key]) => skillRequired.includes(key) && !browserFields.includes(key)
-      );
+      dynamicRefs.forEach(([fieldKey, value]: any) => {
+        const reference = value?.$ref || value?.anyOf?.[0]?.$ref;
+        const referenceKeys = reference.replace("#/", "").split("/");
+        const def = skill.input_schema?.$defs?.[referenceKeys[1]];
+        if (def) {
+          Object.entries(def.properties || {}).forEach(([dynamicKey, dynamicValue]: any) => {
+            if (!browserFields.includes(dynamicKey)) {
+              skillDynamicFields[dynamicKey] = {
+                ...dynamicValue,
+                required: (def.required || []).includes(dynamicKey)
+              };
+            }
+          });
+        }
+      });
+      const allSkillFields = [
+        ...filteredProperties,
+        ...Object.entries(skillDynamicFields)
+      ];
+      // Sort the fields to prioritize required ones
+      allSkillFields.sort(([keyA, fieldA]: any, [keyB, fieldB]: any) => {
+        const isRequiredA = skillRequired.includes(keyA) || fieldA.required;
+        const isRequiredB = skillRequired.includes(keyB) || fieldB.required;
 
-      const otherFields = skillProperties.filter(
-        ([key]) => !skillRequired.includes(key) && !browserFields.includes(key)
-      );
-
+        if (isRequiredA && !isRequiredB) {
+          return -1; // 'A' comes first
+        }
+        if (!isRequiredA && isRequiredB) {
+          return 1; // 'B' comes first
+        }
+        return 0; // Maintain original order if neither is required
+      });
       return (
         <div key={skillName} style={{ marginBottom: '20px' }}>
           <Typography variant="h6" className="skill-section-title">
             {skillName}
           </Typography>
           <Grid container spacing={2} className="skill-form-grid">
-            {requiredFields && requiredFields.map(([fieldKey, widget]: any) => (
+            {allSkillFields.map(([fieldKey, widget]: any) => (
               <Grid
                 item xs={12} md={6} sm={12} lg={6} xl={4}
                 className="grid-padding"
@@ -367,83 +408,17 @@ const AgentFormInputModal = ({
                   formData={formData}
                   agentDetail={localAgentDetail}
                   browserFields={browserFields}
-                  isRequiredField={true}
+                  isRequiredField={skillRequired.includes(fieldKey) || widget.required}
                   chipData={chipData}
                 />
               </Grid>
             ))}
-            {Object.keys(dynamicFieldsData).length > 0 &&
-              renderDynamicFields()}
-            {otherFields
-              .sort(([keyA]: any, [keyB]: any) => keyA.localeCompare(keyB))
-              .map(([fieldKey, widget]: any) => (
-                <Grid
-                  item xs={12} md={6} sm={12} lg={6} xl={4}
-                  className="grid-padding"
-                  key={`${skillName}-${fieldKey}`}
-                >
-                  <CommonComponents
-                    fieldKey={fieldKey}
-                    datavlaue={widget}
-                    handleInputChange={handleInputChange}
-                    formData={formData}
-                    agentDetail={localAgentDetail}
-                    browserFields={browserFields}
-                    isRequiredField={false}
-                    chipData={chipData}
-                  />
-                </Grid>
-              ))}
-            {showComplexFields &&
-              otherFields.filter(
-                ([, value]: any) =>
-                  value?.type === "object" ||
-                  value?.anyOf?.[0]?.type === "object" ||
-                  value?.type === "array" ||
-                  value?.anyOf?.[0]?.type === "array" ||
-                  value?.type === "list" ||
-                  value?.anyOf?.[0]?.type === "list"
-              ).map(([fieldKey, widget]: any) => (
-                <Grid
-                  item xs={12} md={6} sm={12} lg={6} xl={4}
-                  className="grid-padding"
-                  key={`${skillName}-${fieldKey}-complex`}
-                >
-                  <CommonComponents
-                    fieldKey={fieldKey}
-                    datavlaue={widget}
-                    handleInputChange={handleInputChange}
-                    formData={formData}
-                    agentDetail={localAgentDetail}
-                    browserFields={browserFields}
-                    chipData={chipData}
-                  />
-                </Grid>
-              ))}
           </Grid>
         </div>
       );
     });
   };
 
-  const renderDynamicFields = () => {
-    return Object.entries(dynamicFieldsData).map(([fieldKey, fieldData]) => (
-      <Grid item xs={12} md={6} sm={12} lg={6} xl={4} key={fieldKey}>
-        <CommonComponents
-          fieldKey={fieldKey}
-          datavlaue={fieldData}
-          formData={formData2}
-          handleInputChange={(fieldKey, value) =>
-            handleDynamicFieldChange(fieldKey, value, keyName)
-          }
-          agentDetail={localAgentDetail}
-          browserFields={browserFields}
-          isRequiredField={fieldData?.required || false}
-          chipData={chipData}
-        />
-      </Grid>
-    ));
-  };
 
   return (
     <ThemeProvider theme={Theme}>
@@ -495,24 +470,24 @@ const AgentFormInputModal = ({
                       <Grid item xs={12} md={6} sm={12} lg={6} xl={4} className="grid-padding">
                         <CommonComponents
                           fieldKey="model"
-                          datavlaue={{ title: "Model", type: "string" }} // Assuming 'model' is a string type for the dropdown
+                          datavlaue={{ title: "Model", type: "string" }}
                           handleInputChange={handleInputChange}
                           formData={formData}
                           agentDetail={localAgentDetail}
                           browserFields={browserFields}
-                          isRequiredField={true} // Set to true if model is a required field
+                          isRequiredField={true}
                           chipData={chipData}
                         />
                       </Grid>
                       <Grid item xs={12} md={6} sm={12} lg={6} xl={4} className="grid-padding">
                         <CommonComponents
                           fieldKey="agent_system_prompt"
-                          datavlaue={{ title: "System Prompt", type: "string", format: "text-area" }} // Use format: "text-area" for a larger input field
+                          datavlaue={{ title: "System Prompt", type: "string", format: "text-area" }}
                           handleInputChange={handleInputChange}
                           formData={formData}
                           agentDetail={localAgentDetail}
                           browserFields={browserFields}
-                          isRequiredField={false} // Set to true if system prompt is required
+                          isRequiredField={false}
                           chipData={chipData}
                         />
                       </Grid>
