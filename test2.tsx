@@ -54,7 +54,7 @@ const AgentFormInputModal = ({
   const [dynamicFieldsData, setDynamicFieldsData] = useState<{ [key: string]: any; }>({});
   const [formData2, setFormData2] = useState<any>({});
   const [keyName, setKeyName] = useState<string>("");
-  
+
   const [formData, setFormData] = useState<any>(() => {
     if (Object.keys(defaultSelectedParameters).length > 0) {
       return defaultSelectedParameters;
@@ -189,6 +189,8 @@ const AgentFormInputModal = ({
   };
 
   const handleAdditionalFieldsRef = () => {
+    const newDynamicFields: { [key: string]: any } = {};
+
     Object.entries(combinedProperties).forEach(([key, data]: any) => {
       if (data?.$ref || data?.anyOf?.[0]?.$ref) {
         const reference = data?.$ref || data?.anyOf?.[0]?.$ref;
@@ -204,49 +206,29 @@ const AgentFormInputModal = ({
               return;
             }
 
-            const requiredFieldsData: any = {};
-            const nonRequiredFieldsData: any = {};
-
             Object.entries(consensusFields).forEach(
               ([fieldKey, fieldValue]: any) => {
                 const validType =
                   fieldValue?.type ||
                   fieldValue?.anyOf?.[0]?.type ||
                   fieldValue?.$ref;
-                if (!validType || validType === "null") {
+                if (!validType || validType === "null" || browserFields.includes(fieldKey)) {
                   return;
                 }
 
-                if (
-                  requiredField.includes(fieldKey) &&
-                  !browserFields.includes(fieldKey)
-                ) {
-                  fieldValue["required"] = true;
-                  requiredFieldsData[fieldKey] = fieldValue;
-                } else if (!browserFields.includes(fieldKey)) {
-                  nonRequiredFieldsData[fieldKey] = fieldValue;
+                // Check if the field already exists in the newDynamicFields object to prevent duplicates
+                if (!newDynamicFields[fieldKey]) {
+                  const updatedField = { ...fieldValue, required: requiredField.includes(fieldKey) };
+                  newDynamicFields[fieldKey] = updatedField;
                 }
               }
             );
-
-            setChildProperties((prevState) => ({
-              ...prevState,
-              [key]: {
-                ...requiredFieldsData,
-                ...nonRequiredFieldsData,
-              },
-            }));
-
-            setDynamicFieldsData((prevState) => ({
-              ...prevState,
-              ...requiredFieldsData,
-              ...nonRequiredFieldsData,
-            }));
-            setKeyName(key);
           }
         });
       }
     });
+
+    setDynamicFieldsData(newDynamicFields);
   };
 
   const handleDynamicFieldChange = (
