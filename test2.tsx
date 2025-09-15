@@ -284,7 +284,6 @@ const AgentFormInputModal = ({
   }, []);
 
   const isSubmitDisabled = useMemo(() => {
-    // Check for empty static required fields
     const allRequiredFields = combinedRequired.filter(
       (field) => !browserFields.includes(field)
     );
