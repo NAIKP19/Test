@@ -19,6 +19,7 @@ import GlobalLoader from "../common/GlobalLoader";
 import ToastMessage, { TOAST_TYPE } from "../common/ToastMessage/ToastMessage";
 import "./AgentFormInputModal.scss";
 import Loader from "../common/Loader/Loader";
+import { ExpandLess, ExpandMore } from "@mui/icons-material";
 
 function usePrevious(value: any) {
   const ref = useRef();
@@ -39,7 +40,7 @@ const AgentFormInputModal = ({
   chipData,
   loading = false,
   resetFormTrigger,
-  failedCondition = "Agent does not have any configuration.",
+  failedCondition = "This agent currently does not have any skill configurations.",
   defaultSelectedParameters = {},
 }: agentFormInputModalProps) => {
   const [isLoading, setLoading] = useState(false);
@@ -70,12 +71,14 @@ const AgentFormInputModal = ({
       }
     });
 
-    // Always include model and system_prompt from agentDetail initially
     initialState.agent_model = localAgentDetail?.model || "";
     initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
 
     return initialState;
   });
+
+  console.log("FormData", formData);
+
 
   const combinedProperties = useMemo(() => {
     return (localAgentDetail?.skills_config || []).reduce(
@@ -123,8 +126,9 @@ const AgentFormInputModal = ({
       });
     });
 
+    // THis Validation is for the Model Driopdown of the Agent not Skill
     if (localAgentDetail?.model) {
-      requiredFields.add('model');
+      requiredFields.add('agent_model');
     }
 
     return [...requiredFields].some((fieldKey: any) => {
@@ -281,18 +285,57 @@ const AgentFormInputModal = ({
     });
   }, []);
 
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  function transformTitile(str: string) {
+    return str && str
+      .split(/[-\s]/)
+      .map(word =>
+        word.charAt(0).toUpperCase() +
+        word.slice(1).toLowerCase()
+      )
+      .join(' ');
+  }
+
   const renderSkillSections = () => {
     if (!localAgentDetail?.skills_config?.length) {
       return (
-        <h5 className="error-message-container">{failedCondition}</h5>
+        <Grid item xs={12}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: '200px',
+              padding: '20px',
+              border: '1px dashed #ccc',
+              borderRadius: '8px',
+              textAlign: 'center',
+              color: 'text.secondary',
+            }}
+          >
+            {/* <InfoIcon sx={{ fontSize: 48, color: 'text.disabled', marginBottom: '10px' }} /> */}
+            <Typography variant="subtitle1" component="h5" sx={{ color: 'text.secondary' }}>
+              {failedCondition}
+            </Typography>
+          </Box>
+        </Grid>
       );
     }
 
+    const toggleCollapse = (skillName: string) => {
+      setCollapsedSections(prevState => ({
+        ...prevState,
+        [skillName]: !prevState[skillName]
+      }));
+    };
+
     return localAgentDetail.skills_config && localAgentDetail.skills_config.map((skill: any, skillIndex: number) => {
       const skillName = skill.name || `Skill ${skillIndex + 1}`;
+      const isCollapsed = collapsedSections[skillName];
       const skillProperties = Object.entries(skill.input_schema?.properties || {});
       const skillRequired = skill.input_schema?.required || [];
-
       const filteredProperties = skillProperties.filter(([key]) => {
         return !browserFields.includes(key) && key !== "query_params";
       });
@@ -315,6 +358,7 @@ const AgentFormInputModal = ({
           });
         }
       });
+
       const allSkillFields = [
         ...filteredProperties,
         ...Object.entries(skillDynamicFields)
@@ -332,32 +376,58 @@ const AgentFormInputModal = ({
         }
         return 0;
       });
+
       return (
-        <div key={skillName} style={{ marginBottom: '20px', width: '100%' }}>
-          <Typography variant="h6" className="skill-section-title">
-            {skillName}
-          </Typography>
-          <Grid container spacing={2} className="skill-form-grid">
-            {allSkillFields.map(([fieldKey, widget]: any) => (
-              <Grid
-                item xs={12} sm={12} md={6} lg={6} xl={3}
-                className="grid-padding"
-                key={`${skillName}-${fieldKey}`}
-              >
-                <CommonComponents
-                  fieldKey={fieldKey}
-                  datavlaue={widget}
-                  handleInputChange={handleInputChange}
-                  formData={formData}
-                  agentDetail={localAgentDetail}
-                  browserFields={browserFields}
-                  isRequiredField={skillRequired.includes(fieldKey) || widget.required}
-                  chipData={chipData}
-                />
-              </Grid>
-            ))}
-          </Grid>
-        </div>
+        <Box
+          key={skillName}
+          sx={{
+            marginBottom: '20px',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            padding: '16px',
+            width: '100%'
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              cursor: 'pointer',
+            }}
+            onClick={() => toggleCollapse(skillName)}
+          >
+            <Typography variant="h6" className="skill-section-title">
+              {transformTitile(skillName)}
+            </Typography>
+            <IconButton size="small">
+              {isCollapsed ? <ExpandMore /> : <ExpandLess />}
+            </IconButton>
+          </Box>
+          {!isCollapsed && (
+            <Grid container spacing={2} className="skill-form-grid">
+              {allSkillFields.map(([fieldKey, widget]: any) => (
+                <Grid
+                  item xs={12} sm={12} md={6} lg={6} xl={3}
+                  className="grid-padding"
+                  key={`${skillName}-${fieldKey}`}
+                >
+                  <CommonComponents
+                    fieldKey={fieldKey}
+                    datavlaue={widget}
+                    handleInputChange={handleInputChange}
+                    formData={formData}
+                    agentDetail={localAgentDetail}
+                    browserFields={browserFields}
+                    isRequiredField={skillRequired.includes(fieldKey) || widget.required}
+                    chipData={chipData}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
       );
     });
   };
@@ -386,7 +456,7 @@ const AgentFormInputModal = ({
                 <Grid item xs={10} md={10}>
                   <Typography className="modalTitle" variant="h6">
                     <div className="Agent-name">
-                      {title || localAgentDetail?.name}
+                      {title && transformTitile(title) || transformTitile(localAgentDetail?.name)}
                       {!localAgentDetail?.name && <DotAnimation />}
                     </div>
                   </Typography>
@@ -406,35 +476,52 @@ const AgentFormInputModal = ({
                 <Grid container spacing={0} className="agent-container">
                   <div style={{ marginBottom: '20px', width: '100%' }}>
                     <Typography variant="h6" className="skill-section-title">
-                      Agent Configuration
+                      Agent Input
                     </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
-                        <CommonComponents
-                          fieldKey="agent_model"
-                          datavlaue={{ title: "Model", type: "string" }}
-                          handleInputChange={handleInputChange}
-                          formData={formData}
-                          agentDetail={localAgentDetail}
-                          browserFields={browserFields}
-                          isRequiredField={true}
-                          chipData={chipData}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
-                        <CommonComponents
-                          fieldKey="agent_system_prompt"
-                          datavlaue={{ title: "System Prompt", type: "string", format: "text-area" }}
-                          handleInputChange={handleInputChange}
-                          formData={formData}
-                          agentDetail={localAgentDetail}
-                          browserFields={browserFields}
-                          isRequiredField={false}
-                          chipData={chipData}
-                        />
-                      </Grid>
-                    </Grid>
+                    <>
+                      <Box
+                        key={"Agent"}
+                        sx={{
+                          marginBottom: '20px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          padding: '16px',
+                          width: '100%'
+                        }}
+                      >
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
+                            <CommonComponents
+                              fieldKey="agent_model"
+                              datavlaue={{ title: "Model", type: "string" }}
+                              handleInputChange={handleInputChange}
+                              formData={formData}
+                              agentDetail={localAgentDetail}
+                              browserFields={browserFields}
+                              isRequiredField={true}
+                              chipData={chipData}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
+                            <CommonComponents
+                              fieldKey="agent_system_prompt"
+                              datavlaue={{ title: "System Prompt", type: "string", format: "text-area" }}
+                              handleInputChange={handleInputChange}
+                              formData={formData}
+                              agentDetail={localAgentDetail}
+                              browserFields={browserFields}
+                              isRequiredField={false}
+                              chipData={chipData}
+                            />
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    </>
                   </div>
+                  <Typography variant="h6" className="skill-section-title mb-2">
+                    {'Agent Skill Inputs'}
+
+                  </Typography>
                   {renderSkillSections()}
                 </Grid>
               ) : (
