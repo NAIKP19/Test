@@ -50,8 +50,7 @@ const AgentFormInputModal = ({
     severity: TOAST_TYPE.SUCCESS,
   });
   const [localAgentDetail, setLocalAgentDetail] = useState(agentDetail);
-  const [browserFields, setBrowserFields] = useState<string[]>(ignoreFields);
-  const [dynamicFieldsData, setDynamicFieldsData] = useState<{ [key: string]: any; }>({});
+  const [browserFields] = useState<string[]>(ignoreFields);
   const [formData2, setFormData2] = useState<any>({});
   const [keyName, setKeyName] = useState<string>("");
 
@@ -72,7 +71,7 @@ const AgentFormInputModal = ({
     });
 
     // Always include model and system_prompt from agentDetail initially
-    initialState.model = localAgentDetail?.model || "";
+    initialState.agent_model = localAgentDetail?.model || "";
     initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
 
     return initialState;
@@ -88,14 +87,64 @@ const AgentFormInputModal = ({
     );
   }, [localAgentDetail]);
 
-  const combinedRequired = useMemo(() => {
-    return (localAgentDetail?.skills_config || []).reduce(
-      (acc, skill) => [...acc, ...(skill.input_schema?.required || [])],
-      []
-    );
-  }, [localAgentDetail]);
+  const isSubmitDisabled = useMemo(() => {
+    const requiredFields = new Set();
+    const allSchemas = localAgentDetail?.skills_config?.reduce((acc, skill) => ({
+      ...acc,
+      ...(skill.input_schema?.properties || {}),
+      ...Object.entries(skill.input_schema?.$defs || {}).reduce((defsAcc, [key, def]) => ({ ...defsAcc, [key]: def }), {})
+    }), {});
 
-  // useEffects for initialization and reset
+    (localAgentDetail?.skills_config || []).forEach(skill => {
+      (skill.input_schema?.required || []).forEach(key => {
+        if (!browserFields.includes(key)) {
+          const schema = allSchemas?.[key] || skill.input_schema.properties[key];
+          if (schema && schema?.type !== "null" && !schema?.anyOf?.some(item => item?.type === "null")) {
+            requiredFields.add(key);
+          }
+        }
+      });
+
+      Object.entries(skill.input_schema?.properties || {}).forEach(([, data]: any) => {
+        if (data?.$ref || data?.anyOf?.some(item => item?.$ref)) {
+          const reference = data?.$ref || data?.anyOf?.find(item => item?.$ref)?.$ref;
+          if (reference) {
+            const referenceKeys = reference.replace("#/$defs/", "");
+            const def = skill.input_schema?.$defs?.[referenceKeys];
+            if (def) {
+              (def.required || []).forEach(dynamicKey => {
+                if (!browserFields.includes(dynamicKey)) {
+                  requiredFields.add(dynamicKey);
+                }
+              });
+            }
+          }
+        }
+      });
+    });
+
+    if (localAgentDetail?.model) {
+      requiredFields.add('model');
+    }
+
+    return [...requiredFields].some((fieldKey: any) => {
+      const value = formData[fieldKey];
+      const fieldSchema = allSchemas?.[fieldKey];
+
+      if (fieldSchema?.default === null || fieldSchema?.anyOf?.some(item => item?.type === "null")) {
+        return false;
+      }
+      const isEmpty = (val: any) => {
+        if (val === undefined || val === null || val === "") return true;
+        if (Array.isArray(val) && val.length === 0) return true;
+        if (typeof val === "object" && Object.keys(val).length === 0) return true;
+        return false;
+      };
+
+      return isEmpty(value);
+    });
+  }, [formData, localAgentDetail, browserFields, combinedProperties]);
+
   useEffect(() => {
     setLoading(!localAgentDetail?.agent_id && openAgent);
   }, [localAgentDetail, openAgent]);
@@ -129,22 +178,14 @@ const AgentFormInputModal = ({
         }
       });
 
-      // Explicitly reset model and system_prompt
-      initialState.model = localAgentDetail?.model || "";
+      initialState.agent_model = localAgentDetail?.model || "";
       initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
 
       setFormData(initialState);
       setFormData2({});
-      setDynamicFieldsData({});
-      handleAdditionalFieldsRef();
     }
-  }, [resetFormTrigger, localAgentDetail?.agent_id]);
+  }, [resetFormTrigger, localAgentDetail?.agent_id, browserFields]);
 
-  useEffect(() => {
-    handleAdditionalFieldsRef(); // Handle dynamic fields when modal opens
-  }, [openAgent]);
-
-  // Handlers and helper functions
   const updateDefaultsInSkillsConfig = (
     agentDetailtemp: any,
     defaultParams: any
@@ -186,49 +227,6 @@ const AgentFormInputModal = ({
       skill.input_schema = inputSchema;
     }
     return agentDetailtemp;
-  };
-
-  const handleAdditionalFieldsRef = () => {
-    const newDynamicFields: { [key: string]: any } = {};
-
-    Object.entries(combinedProperties).forEach(([key, data]: any) => {
-      if (data?.$ref || data?.anyOf?.[0]?.$ref) {
-        const reference = data?.$ref || data?.anyOf?.[0]?.$ref;
-        const referenceKeys = reference.replace("#/", "").split("/");
-
-        localAgentDetail.skills_config?.forEach((loop: any) => {
-          const def = loop.input_schema?.$defs?.[referenceKeys[1]];
-          if (def) {
-            const consensusFields = def?.properties;
-            const requiredField = def?.required || [];
-
-            if (!consensusFields || Object.keys(consensusFields).length === 0) {
-              return;
-            }
-
-            Object.entries(consensusFields).forEach(
-              ([fieldKey, fieldValue]: any) => {
-                const validType =
-                  fieldValue?.type ||
-                  fieldValue?.anyOf?.[0]?.type ||
-                  fieldValue?.$ref;
-                if (!validType || validType === "null" || browserFields.includes(fieldKey)) {
-                  return;
-                }
-
-                // Check if the field already exists in the newDynamicFields object to prevent duplicates
-                if (!newDynamicFields[fieldKey]) {
-                  const updatedField = { ...fieldValue, required: requiredField.includes(fieldKey) };
-                  newDynamicFields[fieldKey] = updatedField;
-                }
-              }
-            );
-          }
-        });
-      }
-    });
-
-    setDynamicFieldsData(newDynamicFields);
   };
 
   const handleDynamicFieldChange = (
@@ -283,60 +281,6 @@ const AgentFormInputModal = ({
     });
   }, []);
 
-  const isSubmitDisabled = useMemo(() => {
-    const allRequiredFields = combinedRequired.filter(
-      (field) => !browserFields.includes(field)
-    );
-
-    const hasEmptyStaticRequired = allRequiredFields.some((field) => {
-      const value = formData[field];
-      const fieldData = combinedProperties[field];
-
-      // If the field has a default of null or its type is null, it should be considered optional, so return false.
-      if (fieldData?.default === null || fieldData?.anyOf?.[0]?.type === 'null') {
-        return false;
-      }
-
-      return (
-        value === undefined ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0) ||
-        // Explicitly check for null.
-        value === null
-      );
-    });
-
-    if (hasEmptyStaticRequired) return true;
-
-    // Check for empty dynamic required fields
-    const hasEmptyDynamicRequired = Object.entries(dynamicFieldsData).some(
-      ([key, schema]) => {
-        // Only check required fields that aren't in the browserFields list.
-        if (!schema?.required || browserFields.includes(key)) {
-          return false;
-        }
-
-        // If the schema has a default of null or its type is null, it's not truly required.
-        if (schema?.default === null || schema?.anyOf?.[0]?.type === 'null') {
-          return false;
-        }
-
-        const value = formData?.[key] ?? formData?.query_params?.[key] ?? undefined;
-        if (Array.isArray(value)) return value.length === 0;
-        if (typeof value === "object" && value !== null) return Object.keys(value).length === 0;
-        return value === undefined || value === "" || value === null;
-      }
-    );
-
-    return hasEmptyDynamicRequired;
-  }, [
-    combinedRequired,
-    browserFields,
-    formData,
-    dynamicFieldsData,
-    combinedProperties,
-  ]);
-
   const renderSkillSections = () => {
     if (!localAgentDetail?.skills_config?.length) {
       return (
@@ -348,15 +292,15 @@ const AgentFormInputModal = ({
       const skillName = skill.name || `Skill ${skillIndex + 1}`;
       const skillProperties = Object.entries(skill.input_schema?.properties || {});
       const skillRequired = skill.input_schema?.required || [];
-      // Filter properties to exclude browser-specific fields and special cases like query_params
+
       const filteredProperties = skillProperties.filter(([key]) => {
         return !browserFields.includes(key) && key !== "query_params";
       });
-      // Extract and render dynamic fields for this specific skill
+
       const dynamicRefs = skillProperties.filter(([, value]: any) => value?.$ref || value?.anyOf?.[0]?.$ref);
       const skillDynamicFields: { [key: string]: any } = {};
 
-      dynamicRefs.forEach(([fieldKey, value]: any) => {
+      dynamicRefs.forEach(([, value]: any) => {
         const reference = value?.$ref || value?.anyOf?.[0]?.$ref;
         const referenceKeys = reference.replace("#/", "").split("/");
         const def = skill.input_schema?.$defs?.[referenceKeys[1]];
@@ -375,28 +319,28 @@ const AgentFormInputModal = ({
         ...filteredProperties,
         ...Object.entries(skillDynamicFields)
       ];
-      // Sort the fields to prioritize required ones
+
       allSkillFields.sort(([keyA, fieldA]: any, [keyB, fieldB]: any) => {
         const isRequiredA = skillRequired.includes(keyA) || fieldA.required;
         const isRequiredB = skillRequired.includes(keyB) || fieldB.required;
 
         if (isRequiredA && !isRequiredB) {
-          return -1; // 'A' comes first
+          return -1;
         }
         if (!isRequiredA && isRequiredB) {
-          return 1; // 'B' comes first
+          return 1;
         }
-        return 0; // Maintain original order if neither is required
+        return 0;
       });
       return (
-        <div key={skillName} style={{ marginBottom: '20px' }}>
+        <div key={skillName} style={{ marginBottom: '20px', width: '100%' }}>
           <Typography variant="h6" className="skill-section-title">
             {skillName}
           </Typography>
           <Grid container spacing={2} className="skill-form-grid">
             {allSkillFields.map(([fieldKey, widget]: any) => (
               <Grid
-                item xs={12} md={6} sm={12} lg={6} xl={4}
+                item xs={12} sm={12} md={6} lg={6} xl={3}
                 className="grid-padding"
                 key={`${skillName}-${fieldKey}`}
               >
@@ -417,7 +361,6 @@ const AgentFormInputModal = ({
       );
     });
   };
-
 
   return (
     <ThemeProvider theme={Theme}>
@@ -461,14 +404,14 @@ const AgentFormInputModal = ({
               </Grid>
               {!loading ? (
                 <Grid container spacing={0} className="agent-container">
-                  <div style={{ padding: '0 16px', marginBottom: '20px', width: '100%' }}>
+                  <div style={{ marginBottom: '20px', width: '100%' }}>
                     <Typography variant="h6" className="skill-section-title">
                       Agent Configuration
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={12} md={6} sm={12} lg={6} xl={4} className="grid-padding">
+                      <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
                         <CommonComponents
-                          fieldKey="model"
+                          fieldKey="agent_model"
                           datavlaue={{ title: "Model", type: "string" }}
                           handleInputChange={handleInputChange}
                           formData={formData}
@@ -478,7 +421,7 @@ const AgentFormInputModal = ({
                           chipData={chipData}
                         />
                       </Grid>
-                      <Grid item xs={12} md={6} sm={12} lg={6} xl={4} className="grid-padding">
+                      <Grid item xs={12} sm={12} md={6} lg={6} xl={3} className="grid-padding">
                         <CommonComponents
                           fieldKey="agent_system_prompt"
                           datavlaue={{ title: "System Prompt", type: "string", format: "text-area" }}
