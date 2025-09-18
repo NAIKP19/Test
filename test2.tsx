@@ -53,7 +53,6 @@ const AgentFormInputModal = ({
   const [localAgentDetail, setLocalAgentDetail] = useState(agentDetail);
   const [browserFields] = useState<string[]>(ignoreFields);
   const [formData2, setFormData2] = useState<any>({});
-  const [keyName, setKeyName] = useState<string>("");
 
   const [formData, setFormData] = useState<any>(() => {
     if (Object.keys(defaultSelectedParameters).length > 0) {
@@ -77,8 +76,15 @@ const AgentFormInputModal = ({
     return initialState;
   });
 
-  console.log("FormData", formData);
-
+  useEffect(() => {
+    if (agentDetail && (!formData?.agent_model || !formData?.agent_system_prompt)) {
+      setFormData((prevState) => ({
+        ...prevState,
+        agent_model: agentDetail.model || '',
+        agent_system_prompt: agentDetail.system_prompt || '',
+      }));
+    }
+  }, [agentDetail]);
 
   const combinedProperties = useMemo(() => {
     return (localAgentDetail?.skills_config || []).reduce(
@@ -273,8 +279,26 @@ const AgentFormInputModal = ({
     return formData;
   };
 
+  function transformAgentConfig(inputJson) {
+    const result = {
+      agent_input: {},
+      agent_skill_inputs: {}
+    };
+
+    for (const key in inputJson) {
+      if (inputJson.hasOwnProperty(key)) {
+        if (key.startsWith('agent_')) {
+          result.agent_input[key] = inputJson[key];
+        } else {
+          result.agent_skill_inputs[key] = inputJson[key];
+        }
+      }
+    }
+
+    return result;
+  }
   const chooseHandle = () => {
-    let finalFormData = { ...formData };
+    let finalFormData: any = transformAgentConfig(formData);
     onSubmitCallBack(finalFormData, mockupUpdate);
   };
 
@@ -472,13 +496,13 @@ const AgentFormInputModal = ({
                   </div>
                 </Grid>
               </Grid>
-              {!loading ? (
+              {!isLoading ? (
                 <Grid container spacing={0} className="agent-container">
                   <div style={{ marginBottom: '20px', width: '100%' }}>
                     <Typography variant="h6" className="skill-section-title">
                       Agent Input
                     </Typography>
-                    <>
+                    {agentDetail && <>
                       <Box
                         key={"Agent"}
                         sx={{
@@ -516,7 +540,7 @@ const AgentFormInputModal = ({
                           </Grid>
                         </Grid>
                       </Box>
-                    </>
+                    </>}
                   </div>
                   <Typography variant="h6" className="skill-section-title mb-2">
                     {'Agent Skill Inputs'}
