@@ -55,10 +55,6 @@ const AgentFormInputModal = ({
   const [formData2, setFormData2] = useState<any>({});
 
   const [formData, setFormData] = useState<any>(() => {
-    if (Object.keys(defaultSelectedParameters).length > 0) {
-      return defaultSelectedParameters;
-    }
-
     const initialState: any = {};
     const allFields = (localAgentDetail?.skills_config || []).flatMap(
       (skill: any) => Object.entries(skill.input_schema?.properties || {})
@@ -72,6 +68,13 @@ const AgentFormInputModal = ({
 
     initialState.agent_model = localAgentDetail?.model || "";
     initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
+
+    if (Object.keys(defaultSelectedParameters).length > 0) {
+      return {
+        ...initialState,
+        ...defaultSelectedParameters
+      };
+    }
 
     return initialState;
   });
@@ -158,21 +161,6 @@ const AgentFormInputModal = ({
   useEffect(() => {
     setLoading(!localAgentDetail?.agent_id && openAgent);
   }, [localAgentDetail, openAgent]);
-
-  useEffect(() => {
-    if (
-      defaultSelectedParameters &&
-      Object.keys(defaultSelectedParameters).length > 0
-    ) {
-      const updated = updateDefaultsInSkillsConfig(
-        agentDetail,
-        defaultSelectedParameters
-      );
-      setLocalAgentDetail(updated);
-    } else {
-      setLocalAgentDetail(agentDetail);
-    }
-  }, [agentDetail, defaultSelectedParameters]);
 
   useEffect(() => {
     if (resetFormTrigger !== undefined) {
