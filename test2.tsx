@@ -54,7 +54,9 @@ const AgentFormInputModal = ({
   const [formData2, setFormData2] = useState<any>({});
 
   useEffect(() => {
-    setLoading(loading);
+    if (!loading) {
+      setLoading(false);
+    }
   }, [loading])
 
   const [formData, setFormData] = useState<any>(() => {
@@ -69,6 +71,7 @@ const AgentFormInputModal = ({
       }
     });
 
+    initialState.model = localAgentDetail?.model || "";
     initialState.agent_model = localAgentDetail?.model || "";
     initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
 
@@ -90,6 +93,7 @@ const AgentFormInputModal = ({
     if (agentDetail && (!formData?.agent_model || !formData?.agent_system_prompt)) {
       setFormData((prevState) => ({
         ...prevState,
+        model: agentDetail?.model || '',
         agent_model: agentDetail?.model || '',
         agent_system_prompt: agentDetail?.system_prompt || '',
       }));
@@ -178,7 +182,7 @@ const AgentFormInputModal = ({
             value.default === "None" ? "" : value.default || "";
         }
       });
-
+      initialState.model = localAgentDetail?.model || "";
       initialState.agent_model = localAgentDetail?.model || "";
       initialState.agent_system_prompt = localAgentDetail?.system_prompt || "";
 
